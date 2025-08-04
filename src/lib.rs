@@ -2,7 +2,7 @@ use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::process;
-use chrono::NaiveDate;
+use chrono::prelude::*;
 
 #[derive(Clone)]
 pub struct Task {
@@ -277,16 +277,24 @@ fn print_tasks(tasks: &Vec<Task>) {
     println!("{:6} | {:10} | {}", "TASK #", "DUE DATE", "TASK");
     println!("==========================");
 
+    let default_color = "\x1b[0m";
+    let overdue_color = "\x1b[0;31m";
+
     for task in tasks.iter() {
         let mut due_date = String::new();
         if task.due_date != NaiveDate::MAX {
             due_date = task.due_date.format("%Y-%m-%d").to_string();
         }
 
-        println!("{:6} | {:10} | {}",
+        if task.due_date <= Local::now().date_naive() {
+            print!("{}", overdue_color);
+        }
+
+        println!("{:6} | {:10} | {}{}",
             task.order,
             due_date,
-            task.name
+            task.name,
+            default_color,
         );
     }
 }
