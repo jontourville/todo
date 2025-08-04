@@ -2,14 +2,13 @@ use std::fs;
 use std::fs::File;
 use std::io::prelude::*;
 use std::process;
+use chrono::NaiveDate;
 
-#[derive(Debug)]
 pub struct Task {
     pub name: String,
-    pub order: i32,
+    pub due_date: NaiveDate,
 }
 
-#[derive(Debug)]
 pub struct TodoList {
     pub path: String,
     pub tasks: Vec<Task>,
@@ -23,8 +22,6 @@ impl TodoList {
             tasks: Vec::new(),
         };
 
-        let mut order: i32 = 1;
-
         for line in fs::read_to_string(path).unwrap_or_default().lines() {
             let line = line.trim();
 
@@ -32,12 +29,20 @@ impl TodoList {
                 continue;
             }
 
-            list.tasks.push(Task {
-                name: line.to_string(),
-                order: order,
+            // Expected format is DATE,TASK NAME
+            let (date_text, name) = line.split_once(',').unwrap_or_else(|| {
+                ("", line)
             });
 
-            order += 1;
+            let due_date = NaiveDate::parse_from_str(
+                date_text, 
+                "%Y-%m-%d")
+                .unwrap_or_else(|_| { NaiveDate::MAX });
+
+            list.tasks.push(Task {
+                name: name.to_string(),
+                due_date: due_date,
+            });
         }
 
         list
@@ -46,11 +51,28 @@ impl TodoList {
     // Print all tasks
     pub fn print(&self) {
         if self.tasks.len() == 0 {
-            println!("    (empty)");
+            println!("(empty TODO list)");
+            return;
         }
 
+        let mut order = 1;
+
+        println!("{:6} | {:10} | {}", "TASK #", "DUE DATE", "TASK");
+        println!("==========================");
+
         for task in self.tasks.iter() {
-            println!("{:5}. {}", task.order, task.name);
+            let mut due_date = String::new();
+            if task.due_date != NaiveDate::MAX {
+                due_date = task.due_date.format("%Y-%m-%d").to_string();
+            }
+
+            println!("{:6} | {:10} | {}",
+                order,
+                due_date,
+                task.name
+            );
+
+            order += 1;
         }
     }
 
@@ -59,22 +81,20 @@ impl TodoList {
         let mut file = File::create(&self.path)?;
 
         for task in self.tasks.iter() {
-            writeln!(file, "{}", task.name)?;
+            writeln!(file, "{},{}",
+                task.due_date.format("%Y-%m-%d").to_string(),
+                task.name
+            )?;
         }
 
         Ok(())
     }
 
     // Add a new task to the TODO list
-    pub fn add(&mut self, name: &String) {
-        let order = match self.tasks.last() {
-            Some(task) => task.order + 1,
-            None => 1,
-        };
-
+    pub fn add(&mut self, name: &String, due_date: NaiveDate) {
         self.tasks.push(Task {
             name: name.clone(),
-            order: order,
+            due_date: due_date,
         });
     }
 }
@@ -128,7 +148,13 @@ fn parse_add(
         process::exit(1);
     }
 
-    list.add(&name.unwrap());
+    let date_text = args.next().unwrap_or_default();
+    let due_date = NaiveDate::parse_from_str(
+        date_text.as_str(), 
+        "%Y-%m-%d")
+        .unwrap_or_else(|_| { NaiveDate::MAX });
+
+    list.add(&name.unwrap(), due_date);
     list.print();
 }
 
@@ -140,8 +166,9 @@ fn print_usage() {
     eprintln!("  list");
     eprintln!("    print current TODO list (default command)");
     eprintln!("");
-    eprintln!("  add TASK");
-    eprintln!("    add a new task to the end");
+    eprintln!("  add TASK [DUE DATE]");
+    eprintln!("    add a new task to the end with an optional due date");
+    eprintln!("    in the format YYYY-MM-DD");
     eprintln!("");
     eprintln!("  remove POSITION");
     eprintln!("    remove task at POSITION");
