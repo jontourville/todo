@@ -17,7 +17,7 @@ pub struct TodoList {
 }
 
 impl TodoList {
-    // Load and return a TODO list from a file
+    // Load and return a todo list from a file
     pub fn load(path: &String) -> TodoList {
         let mut list = TodoList {
             path: path.clone(),
@@ -67,7 +67,7 @@ impl TodoList {
         print_tasks(&tasks);
     }
 
-    // Save the TODO list
+    // Save the todo list
     pub fn save(&self) -> Result<(), std::io::Error> {
         let mut file = File::create(&self.path)?;
 
@@ -81,7 +81,7 @@ impl TodoList {
         Ok(())
     }
 
-    // Add a new task to the TODO list
+    // Add a new task to the todo list
     pub fn add(&mut self, name: &String, due_date: NaiveDate) {
         self.tasks.push(Task {
             name: name.clone(),
@@ -90,7 +90,7 @@ impl TodoList {
         });
     }
 
-    // Remove a task from the TODO list
+    // Remove a task from the todo list
     pub fn remove(&mut self, index: usize) {
         if index >= self.tasks.len() {
             eprintln!(
@@ -100,8 +100,23 @@ impl TodoList {
             process::exit(1);
         }
 
-        let task = self.tasks.remove(index);
-        println!("Removed task: {}", task.name);
+        self.tasks.remove(index);
+        println!("Removed task {}", index + 1);
+    }
+
+    // Move a task to a different position
+    pub fn reorder(&mut self, from: usize, to: usize) {
+        if from >= self.tasks.len() || to >= self.tasks.len() {
+            eprintln!(
+                "Error positions must be between 1 and {}",
+                self.tasks.len()
+            );
+            process::exit(1);
+        }
+
+        let task = self.tasks.remove(from);
+        self.tasks.insert(to, task);
+        println!("Moved task {} to {}", from + 1, to + 1);
     }
 
     // Update the tasks' with their order in the Vec
@@ -139,7 +154,7 @@ pub fn parse_command(mut args: impl Iterator<Item = String>) {
         },
         "add" => parse_add(args, &mut list),
         "remove" => parse_remove(args, &mut list),
-        "move" => println!("Moving task..."),
+        "move" => parse_move(args, &mut list),
         "help" | "--help" | "-h" => print_usage(),
         _ => {
             eprintln!("Error unknown command: {command}");
@@ -150,7 +165,7 @@ pub fn parse_command(mut args: impl Iterator<Item = String>) {
 
     if is_modified {
         list.save().unwrap_or_else(|err| {
-            eprintln!("Error saving TODO list to {}", list.path);
+            eprintln!("Error saving todo list to {}", list.path);
             eprintln!("{err}");
             process::exit(1);
         });
@@ -207,9 +222,55 @@ fn parse_remove(
     list.remove(position - 1);
 }
 
+fn parse_move(
+    mut args: impl Iterator<Item = String>,
+    list: &mut TodoList,
+) {
+    let from = match args.next() {
+        Some(num) => num,
+        None => {
+            eprintln!("Error no from position provided to move command");
+            print_usage();
+            process::exit(1);
+        }
+    };
+
+    let from: usize = match usize::from_str_radix(from.as_str(), 10) {
+        Ok(num) => num,
+        Err(_) => {
+            eprintln!("Error invalid from position provided to move command");
+            process::exit(1);
+        }
+    };
+
+    let to = match args.next() {
+        Some(num) => num,
+        None => {
+            eprintln!("Error no to position provided to move command");
+            print_usage();
+            process::exit(1);
+        }
+    };
+
+    let to: usize = match usize::from_str_radix(to.as_str(), 10) {
+        Ok(num) => num,
+        Err(_) => {
+            eprintln!("Error invalid to position provided to move command");
+            process::exit(1);
+        }
+    };
+
+    if from < 1 || to < 1 {
+        eprintln!("Error positions cannot be < 1");
+        process::exit(1);
+    }
+
+    list.reorder(from - 1, to - 1);
+}
+
 fn print_tasks(tasks: &Vec<Task>) {
     if tasks.len() == 0 {
-        println!("(empty TODO list)");
+        println!("(empty todo list)");
         return;
     }
 
@@ -236,10 +297,10 @@ fn print_usage() {
     eprintln!("");
     eprintln!("Commands:");
     eprintln!("  list");
-    eprintln!("    print current TODO list (default command)");
+    eprintln!("    print current todo list (default command)");
     eprintln!("");
     eprintln!("  date");
-    eprintln!("    print current TODO list sorted by due date");
+    eprintln!("    print current todo list sorted by due date");
     eprintln!("");
     eprintln!("  add TASK [DUE DATE]");
     eprintln!("    add a new task to the end with an optional due date");
@@ -248,6 +309,6 @@ fn print_usage() {
     eprintln!("  remove POSITION");
     eprintln!("    remove task at POSITION");
     eprintln!("");
-    eprintln!("  move FROM_POSITION TO_POSITION");
+    eprintln!("  move FROM TO");
     eprintln!("    move task from one position to another");
 }
