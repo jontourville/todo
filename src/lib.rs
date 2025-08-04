@@ -4,9 +4,11 @@ use std::io::prelude::*;
 use std::process;
 use chrono::NaiveDate;
 
+#[derive(Clone)]
 pub struct Task {
     pub name: String,
     pub due_date: NaiveDate,
+    pub order: i32, // Used to store original order when sorting by date
 }
 
 pub struct TodoList {
@@ -42,38 +44,27 @@ impl TodoList {
             list.tasks.push(Task {
                 name: name.to_string(),
                 due_date: due_date,
+                order: 0,
             });
         }
 
         list
     }
 
-    // Print all tasks
-    pub fn print(&self) {
-        if self.tasks.len() == 0 {
-            println!("(empty TODO list)");
-            return;
-        }
+    // Print all tasks in order
+    pub fn print(&mut self) {
+        self.update_order();
+        print_tasks(&self.tasks);
+    }
 
-        let mut order = 1;
+    // Print all tasks sorted by due date
+    pub fn print_by_due_date(&mut self) {
+        self.update_order();
 
-        println!("{:6} | {:10} | {}", "TASK #", "DUE DATE", "TASK");
-        println!("==========================");
+        let mut tasks = self.tasks.clone();
+        tasks.sort_by_key(|task| {task.due_date});
 
-        for task in self.tasks.iter() {
-            let mut due_date = String::new();
-            if task.due_date != NaiveDate::MAX {
-                due_date = task.due_date.format("%Y-%m-%d").to_string();
-            }
-
-            println!("{:6} | {:10} | {}",
-                order,
-                due_date,
-                task.name
-            );
-
-            order += 1;
-        }
+        print_tasks(&tasks);
     }
 
     // Save the TODO list
@@ -95,7 +86,18 @@ impl TodoList {
         self.tasks.push(Task {
             name: name.clone(),
             due_date: due_date,
+            order: 0,
         });
+    }
+
+    // Update the tasks' with their order in the Vec
+    fn update_order(&mut self) {
+        let mut order = 1;
+
+        for task in self.tasks.iter_mut() {
+            task.order = order;
+            order += 1;
+        }
     }
 }
 
@@ -115,6 +117,10 @@ pub fn parse_command(mut args: impl Iterator<Item = String>) {
     match command.as_str() {
         "list" => {
             list.print();
+            is_modified = false;
+        },
+        "date" => {
+            list.print_by_due_date();
             is_modified = false;
         },
         "add" => parse_add(args, &mut list),
@@ -158,6 +164,29 @@ fn parse_add(
     list.print();
 }
 
+fn print_tasks(tasks: &Vec<Task>) {
+    if tasks.len() == 0 {
+        println!("(empty TODO list)");
+        return;
+    }
+
+    println!("{:6} | {:10} | {}", "TASK #", "DUE DATE", "TASK");
+    println!("==========================");
+
+    for task in tasks.iter() {
+        let mut due_date = String::new();
+        if task.due_date != NaiveDate::MAX {
+            due_date = task.due_date.format("%Y-%m-%d").to_string();
+        }
+
+        println!("{:6} | {:10} | {}",
+            task.order,
+            due_date,
+            task.name
+        );
+    }
+}
+
 fn print_usage() {
     eprintln!("Usage:");
     eprintln!("  todo [COMMAND [ARGUMENT]...]");
@@ -165,6 +194,9 @@ fn print_usage() {
     eprintln!("Commands:");
     eprintln!("  list");
     eprintln!("    print current TODO list (default command)");
+    eprintln!("");
+    eprintln!("  date");
+    eprintln!("    print current TODO list sorted by due date");
     eprintln!("");
     eprintln!("  add TASK [DUE DATE]");
     eprintln!("    add a new task to the end with an optional due date");
