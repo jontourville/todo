@@ -8,7 +8,7 @@ use chrono::NaiveDate;
 pub struct Task {
     pub name: String,
     pub due_date: NaiveDate,
-    pub order: i32, // Used to store original order when sorting by date
+    pub order: usize, // Used to store original order when sorting by date
 }
 
 pub struct TodoList {
@@ -90,6 +90,20 @@ impl TodoList {
         });
     }
 
+    // Remove a task from the TODO list
+    pub fn remove(&mut self, index: usize) {
+        if index >= self.tasks.len() {
+            eprintln!(
+                "Error position must be between 1 and {}",
+                self.tasks.len()
+            );
+            process::exit(1);
+        }
+
+        let task = self.tasks.remove(index);
+        println!("Removed task: {}", task.name);
+    }
+
     // Update the tasks' with their order in the Vec
     fn update_order(&mut self) {
         let mut order = 1;
@@ -124,7 +138,7 @@ pub fn parse_command(mut args: impl Iterator<Item = String>) {
             is_modified = false;
         },
         "add" => parse_add(args, &mut list),
-        "remove" => println!("Removing task..."),
+        "remove" => parse_remove(args, &mut list),
         "move" => println!("Moving task..."),
         "help" | "--help" | "-h" => print_usage(),
         _ => {
@@ -162,6 +176,35 @@ fn parse_add(
 
     list.add(&name.unwrap(), due_date);
     list.print();
+}
+
+fn parse_remove(
+    mut args: impl Iterator<Item = String>,
+    list: &mut TodoList,
+) {
+    let position = match args.next() {
+        Some(num) => num,
+        None => {
+            eprintln!("Error no position provided to remove command");
+            print_usage();
+            process::exit(1);
+        }
+    };
+
+    let position: usize = match usize::from_str_radix(position.as_str(), 10) {
+        Ok(num) => num,
+        Err(_) => {
+            eprintln!("Error invalid position provided to remove command");
+            process::exit(1);
+        }
+    };
+
+    if position < 1 {
+        eprintln!("Error position cannot be < 1");
+        process::exit(1);
+    }
+
+    list.remove(position - 1);
 }
 
 fn print_tasks(tasks: &Vec<Task>) {
