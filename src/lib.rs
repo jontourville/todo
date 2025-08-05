@@ -3,8 +3,9 @@ use std::fs::File;
 use std::io::prelude::*;
 use std::process;
 use chrono::prelude::*;
+use std::cmp::Ordering;
 
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 pub struct Task {
     pub name: String,
     pub due_date: NaiveDate,
@@ -14,6 +15,27 @@ pub struct Task {
 pub struct TodoList {
     pub path: String,
     pub tasks: Vec<Task>,
+}
+
+// Order tasks by due date when sorting
+impl Ord for Task {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.due_date
+            .cmp(&other.due_date)
+            .then(self.order.cmp(&other.order))
+    }
+}
+
+impl PartialOrd for Task {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl PartialEq for Task {
+    fn eq(&self, other: &Self) -> bool {
+        self.due_date == other.due_date && self.order == other.order
+    }
 }
 
 impl TodoList {
@@ -62,7 +84,7 @@ impl TodoList {
         self.update_order();
 
         let mut tasks = self.tasks.clone();
-        tasks.sort_by_key(|task| {task.due_date});
+        tasks.sort();
 
         print_tasks(&tasks);
     }
