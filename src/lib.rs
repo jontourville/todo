@@ -40,7 +40,7 @@ impl PartialEq for Task {
 
 impl TodoList {
     // Load and return a todo list from a file
-    pub fn load(path: &String) -> TodoList {
+    pub fn load(path: String) -> TodoList {
         let mut list = TodoList {
             path: path.clone(),
             tasks: Vec::new(),
@@ -110,7 +110,7 @@ impl TodoList {
     }
 
     // Add a new task to the todo list
-    pub fn add(&mut self, name: &String, due_date: NaiveDate) {
+    pub fn add(&mut self, name: String, due_date: NaiveDate) {
         self.tasks.push(Task {
             name: name.clone(),
             due_date: due_date,
@@ -168,7 +168,7 @@ pub fn parse_command(mut args: impl Iterator<Item = String>) {
     // to support per-project lists
     let path = String::from(".todo");
 
-    let mut list = TodoList::load(&path);
+    let mut list = TodoList::load(path);
     let mut is_modified = false;
 
     // Parse the command argument, defaulting to "list"
@@ -238,7 +238,7 @@ fn parse_add(
         "%Y-%m-%d")
         .unwrap_or_else(|_| { NaiveDate::MAX });
 
-    list.add(&name.unwrap(), due_date);
+    list.add(name.unwrap(), due_date);
 }
 
 // Parse the remove command's arguments and remove the task
@@ -372,4 +372,31 @@ fn print_usage() {
     eprintln!("");
     eprintln!("  move FROM TO");
     eprintln!("    move task from one position to another");
+}
+
+// TODO: more extensive tests
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn load_empty() {
+        let list = TodoList::load("nonexistent_file_path".to_string());
+        assert!(list.tasks.is_empty());
+    }
+
+    #[test]
+    fn add_one() {
+        let mut list = TodoList::load("nonexistent_file_path".to_string());
+        list.add("Task A".to_string(), NaiveDate::MAX);
+        assert!(list.tasks.len() == 1);
+    }
+
+    #[test]
+    fn remove_one() {
+        let mut list = TodoList::load("nonexistent_file_path".to_string());
+        list.add("Task A".to_string(), NaiveDate::MAX);
+        list.remove(0);
+        assert!(list.tasks.is_empty());
+    }
 }
