@@ -88,6 +88,8 @@ impl TodoList {
             due_date: due_date,
             order: 0,
         });
+
+        println!("Added task {}", self.tasks.len());
     }
 
     // Remove a task from the todo list
@@ -190,7 +192,6 @@ fn parse_add(
         .unwrap_or_else(|_| { NaiveDate::MAX });
 
     list.add(&name.unwrap(), due_date);
-    list.print();
 }
 
 fn parse_remove(
