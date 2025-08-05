@@ -48,6 +48,8 @@ impl TodoList {
 
         let mut order: usize = 1;
 
+        // Read in the todo list, initializing an empty list if the
+        // file doesn't exist or is empty
         for line in fs::read_to_string(path).unwrap_or_default().lines() {
             let line = line.trim();
 
@@ -56,10 +58,13 @@ impl TodoList {
             }
 
             // Expected format is DATE,TASK NAME
+            // Order is determined by line number and not stored in the file
             let (date_text, name) = line.split_once(',').unwrap_or_else(|| {
                 ("", line)
             });
 
+            // Nonexistent or invalid due dates are interpreted as the max date
+            // so they appear at the end when sorting by date
             let due_date = NaiveDate::parse_from_str(
                 date_text, 
                 "%Y-%m-%d")
@@ -89,7 +94,7 @@ impl TodoList {
         print_tasks(&tasks);
     }
 
-    // Save the todo list
+    // Save the todo list to a file
     pub fn save(&self) -> Result<(), std::io::Error> {
         let mut file = File::create(&self.path)?;
 
@@ -100,6 +105,7 @@ impl TodoList {
             )?;
         }
 
+        println!("Saved todo list to: {}", self.path);
         Ok(())
     }
 
@@ -158,11 +164,14 @@ impl TodoList {
 
 // Parse the program arguments and perform the specified command
 pub fn parse_command(mut args: impl Iterator<Item = String>) {
+    // Use the current directory to load/save the todo list
+    // to support per-project lists
     let path = String::from(".todo");
 
     let mut list = TodoList::load(&path);
     let mut is_modified = false;
 
+    // Parse the command argument, defaulting to "list"
     args.next();
     let command = match args.next() {
         Some(arg) => arg,
@@ -171,20 +180,26 @@ pub fn parse_command(mut args: impl Iterator<Item = String>) {
 
     match command.as_str() {
         "list" => list.print(),
+
         "date" => list.print_by_due_date(),
+
         "add" => {
             parse_add(args, &mut list);
             is_modified = true;
         },
+
         "remove" => {
             parse_remove(args, &mut list);
             is_modified = true;
         },
+
         "move" => {
             parse_move(args, &mut list);
             is_modified = true;
         },
+
         "help" | "--help" | "-h" => print_usage(),
+
         _ => {
             eprintln!("Error unknown command: {command}");
             print_usage();
@@ -192,6 +207,7 @@ pub fn parse_command(mut args: impl Iterator<Item = String>) {
         }
     }
 
+    // Only write to disk if the command modified the todo list
     if is_modified {
         list.save().unwrap_or_else(|err| {
             eprintln!("Error saving todo list to {}", list.path);
@@ -213,6 +229,9 @@ fn parse_add(
         process::exit(1);
     }
 
+    // Currently, invalid or nonexistent due dates are interpreted
+    // as max date for sorting
+    // TODO: handle invalid dates separately and error out
     let date_text = args.next().unwrap_or_default();
     let due_date = NaiveDate::parse_from_str(
         date_text.as_str(), 
@@ -309,6 +328,7 @@ fn print_tasks(tasks: &Vec<Task>) {
     println!("{:6} | {:10} | {}", "TASK #", "DUE DATE", "TASK");
     println!("==========================");
 
+    // Print tasks past their due date in red
     let default_color = "\x1b[0m";
     let overdue_color = "\x1b[0;31m";
 
