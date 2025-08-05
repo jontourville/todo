@@ -9,7 +9,7 @@ use std::cmp::Ordering;
 pub struct Task {
     pub name: String,
     pub due_date: NaiveDate,
-    pub order: usize, // Used to store original order when sorting by date
+    pub order: usize,
 }
 
 pub struct TodoList {
@@ -46,6 +46,8 @@ impl TodoList {
             tasks: Vec::new(),
         };
 
+        let mut order: usize = 1;
+
         for line in fs::read_to_string(path).unwrap_or_default().lines() {
             let line = line.trim();
 
@@ -66,8 +68,10 @@ impl TodoList {
             list.tasks.push(Task {
                 name: name.to_string(),
                 due_date: due_date,
-                order: 0,
+                order: order,
             });
+
+            order += 1;
         }
 
         list
@@ -75,17 +79,13 @@ impl TodoList {
 
     // Print all tasks in order
     pub fn print(&mut self) {
-        self.update_order();
         print_tasks(&self.tasks);
     }
 
     // Print all tasks sorted by due date
     pub fn print_by_due_date(&mut self) {
-        self.update_order();
-
         let mut tasks = self.tasks.clone();
         tasks.sort();
-
         print_tasks(&tasks);
     }
 
@@ -108,7 +108,7 @@ impl TodoList {
         self.tasks.push(Task {
             name: name.clone(),
             due_date: due_date,
-            order: 0,
+            order: self.tasks.len() + 1,
         });
 
         println!("Added task {}", self.tasks.len());
@@ -125,6 +125,7 @@ impl TodoList {
         }
 
         self.tasks.remove(index);
+        self.update_order();
         println!("Removed task {}", index + 1);
     }
 
@@ -140,10 +141,11 @@ impl TodoList {
 
         let task = self.tasks.remove(from);
         self.tasks.insert(to, task);
+        self.update_order();
         println!("Moved task {} to {}", from + 1, to + 1);
     }
 
-    // Update the tasks' with their order in the Vec
+    // Update all tasks'order based on their position in the Vec
     fn update_order(&mut self) {
         let mut order = 1;
 
@@ -159,7 +161,7 @@ pub fn parse_command(mut args: impl Iterator<Item = String>) {
     let path = String::from(".todo");
 
     let mut list = TodoList::load(&path);
-    let mut is_modified = true;
+    let mut is_modified = false;
 
     args.next();
     let command = match args.next() {
@@ -168,17 +170,20 @@ pub fn parse_command(mut args: impl Iterator<Item = String>) {
     };
 
     match command.as_str() {
-        "list" => {
-            list.print();
-            is_modified = false;
+        "list" => list.print(),
+        "date" => list.print_by_due_date(),
+        "add" => {
+            parse_add(args, &mut list);
+            is_modified = true;
         },
-        "date" => {
-            list.print_by_due_date();
-            is_modified = false;
+        "remove" => {
+            parse_remove(args, &mut list);
+            is_modified = true;
         },
-        "add" => parse_add(args, &mut list),
-        "remove" => parse_remove(args, &mut list),
-        "move" => parse_move(args, &mut list),
+        "move" => {
+            parse_move(args, &mut list);
+            is_modified = true;
+        },
         "help" | "--help" | "-h" => print_usage(),
         _ => {
             eprintln!("Error unknown command: {command}");
@@ -196,6 +201,7 @@ pub fn parse_command(mut args: impl Iterator<Item = String>) {
     }
 }
 
+// Parse the add command's arguments and add the task
 fn parse_add(
     mut args: impl Iterator<Item = String>,
     list: &mut TodoList,
@@ -216,6 +222,7 @@ fn parse_add(
     list.add(&name.unwrap(), due_date);
 }
 
+// Parse the remove command's arguments and remove the task
 fn parse_remove(
     mut args: impl Iterator<Item = String>,
     list: &mut TodoList,
@@ -245,6 +252,7 @@ fn parse_remove(
     list.remove(position - 1);
 }
 
+// Parse the move command's arguments and move the task to a new position
 fn parse_move(
     mut args: impl Iterator<Item = String>,
     list: &mut TodoList,
@@ -291,6 +299,7 @@ fn parse_move(
     list.reorder(from - 1, to - 1);
 }
 
+// Print all tasks in the order provided
 fn print_tasks(tasks: &Vec<Task>) {
     if tasks.len() == 0 {
         println!("(empty todo list)");
@@ -322,6 +331,7 @@ fn print_tasks(tasks: &Vec<Task>) {
     }
 }
 
+// Print program usage statement
 fn print_usage() {
     eprintln!("Usage:");
     eprintln!("  todo [COMMAND [ARGUMENT]...]");
